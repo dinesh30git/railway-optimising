@@ -1,0 +1,72 @@
+/* Global reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Page background */
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f3f6fb;
+  color: #1f2937;
+}
+
+/* Layout grids */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 16px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin: 16px;
+}
+
+/* Cards */
+.card {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.table-card,
+.network-card {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+/* Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+th,
+td {
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+th {
+  font-weight: 600;
+}
+
+/* Text helpers */
+.card-value {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.network-note {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 8px;
+}
