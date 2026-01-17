@@ -39,46 +39,16 @@ def same_track_conflict():
     if t1 is None or t2 is None:
         return
 
-    # ==============================
-    # TIE-BREAKER LOGIC
-    # ==============================
     if t1["priority"] == t2["priority"] and cp1 == cp2:
-        print("\n⚠ Same priority & same checkpoint detected")
-
-        # Passenger vs Passenger
         if t1["train_type"] != "Goods" and t2["train_type"] != "Goods":
-            print("🚆 Passenger vs Passenger decision")
-            if t1["passenger_count"] > t2["passenger_count"]:
-                priority_train, reduced_train = t1, t2
-            else:
-                priority_train, reduced_train = t2, t1
-
-        # Goods vs Goods
+            priority_train, reduced_train = (t1, t2) if t1["passenger_count"] > t2["passenger_count"] else (t2, t1)
         elif t1["train_type"] == "Goods" and t2["train_type"] == "Goods":
-            print("🚛 Goods vs Goods decision")
-            if goods_weight_rank(t1["goods_weight"]) > goods_weight_rank(t2["goods_weight"]):
-                priority_train, reduced_train = t1, t2
-            else:
-                priority_train, reduced_train = t2, t1
-
-        # Mixed type → fallback to ML
+            priority_train, reduced_train = (t1, t2) if goods_weight_rank(t1["goods_weight"]) > goods_weight_rank(t2["goods_weight"]) else (t2, t1)
         else:
-            print("🔄 Mixed train types → ML decision")
-            features = [[t1["priority"], t2["priority"], cp1, cp2]]
-            decision = model.predict(features)[0]
+            decision = model.predict([[t1["priority"], t2["priority"], cp1, cp2]])[0]
             priority_train, reduced_train = (t1, t2) if decision == 0 else (t2, t1)
-
     else:
-        # ==============================
-        # ORIGINAL ML LOGIC (UNCHANGED)
-        # ==============================
-        features = [[
-            t1["priority"],
-            t2["priority"],
-            cp1,
-            cp2
-        ]]
-        decision = model.predict(features)[0]
+        decision = model.predict([[t1["priority"], t2["priority"], cp1, cp2]])[0]
         priority_train, reduced_train = (t1, t2) if decision == 0 else (t2, t1)
 
     reduced_speed = int(reduced_train["max_speed"] * 0.6)
@@ -86,7 +56,68 @@ def same_track_conflict():
     print("\n🚦 CONTROLLER DECISION")
     print(f"➡ Priority Train : {priority_train['train_id']}")
     print(f"⏸ Reduced Train  : {reduced_train['train_id']}")
-    print(f"⚠ Suggested Speed Limit for {reduced_train['train_id']}: {reduced_speed} km/h")
+    print(f"⚠ Speed Limit    : {reduced_speed} km/h")
+
+# ==============================
+# DEPARTURE DELAY CONFLICT (NEW)
+# ==============================
+def departure_delay_conflict():
+    print("\n--- DEPARTURE DELAY (REALISTIC CONTROL) ---")
+
+    delayed_train_id = input("Enter Departure Delayed Train ID: ")
+    delayed_train = get_train(delayed_train_id)
+    if delayed_train is None:
+        return
+
+    upcoming_id = input("Enter Upcoming Train ID: ")
+    upcoming_train = get_train(upcoming_id)
+    if upcoming_train is None:
+        return
+
+    train_type = upcoming_train["train_type"]
+
+    print(f"\n➡ Upcoming Train Type: {train_type}")
+
+    # ------------------------------
+    # LOOP LINE LOGIC
+    # ------------------------------
+    if train_type in ["Express", "Goods"]:
+        print(
+            f"🚦 {train_type} Train {upcoming_id} "
+            f"→ LOOP LINE CROSSING"
+        )
+        
+        return
+
+    # ------------------------------
+    # REDUCED SPEED LOGIC
+    # ------------------------------
+    if train_type in ["Passenger", "Local", "Premium"]:
+        reduced_speed = int(upcoming_train["max_speed"] * 0.6)
+
+        print(
+            f"🚆 {train_type} Train {upcoming_id} "
+            f"→ CAUTION BEFORE STATION"
+        )
+        print(
+            f"⚠ Reduced Speed: {reduced_speed} km/h"
+        )
+        print(
+            f"➡ Departure delayed Train {delayed_train_id} "
+            f"cleared FIRST from station"
+        )
+       
+        return
+
+    # ------------------------------
+    # SAFETY FALLBACK
+    # ------------------------------
+    reduced_speed = int(upcoming_train["max_speed"] * 0.6)
+    print(
+        f"⚠ Unknown train type '{train_type}' "
+        f"→ Treated as Passenger | "
+        f"Speed {reduced_speed} km/h"
+    )
 
 # ==============================
 # DELAY CONFLICT (BLOCK-BASED)
@@ -110,21 +141,11 @@ def delay_conflict():
         & (df["arrival_time"].apply(time_to_minutes) > delayed_arrival)
     ].sort_values("arrival_time")
 
-    print("\n🚦 REAL-TIME CONTROLLER DECISIONS")
-
     delay_cleared = False
 
     for _, row in upcoming_trains.iterrows():
-        print(
-            f"\n➡ Upcoming Train {row['train_id']} "
-            f"(Arrival {row['arrival_time']})"
-        )
-
         if not delay_cleared:
-            cleared = input(
-                "Has delayed train cleared the junction? (yes/no): "
-            ).lower()
-
+            cleared = input("Has delayed train cleared junction? (yes/no): ").lower()
             if cleared == "no":
                 reduced_speed = int(row["max_speed"] * 0.6)
                 print(
@@ -135,10 +156,7 @@ def delay_conflict():
             else:
                 delay_cleared = True
 
-        main_free = input(
-            "Is MAIN LINE free for this train? (yes/no): "
-        ).lower()
-
+        main_free = input("Is MAIN LINE free? (yes/no): ").lower()
         if main_free == "yes":
             print(f"➡ Train {row['train_id']} → MAIN LINE")
         else:
@@ -157,16 +175,19 @@ def controller_menu():
         print("  TRAIN TRAFFIC CONTROLLER SYSTEM")
         print("=================================")
         print("1️⃣ Same Track / Junction Conflict")
-        print("2️⃣ Delay Conflict")
-        print("3️⃣ Exit")
+        print("2️⃣ Arrival / Block Delay Conflict")
+        print("3️⃣ Departure Delay Conflict (NEW)")
+        print("4️⃣ Exit")
 
-        choice = input("Select option (1/2/3): ")
+        choice = input("Select option (1/2/3/4): ")
 
         if choice == "1":
             same_track_conflict()
         elif choice == "2":
             delay_conflict()
         elif choice == "3":
+            departure_delay_conflict()
+        elif choice == "4":
             print("Exiting controller system.")
             break
         else:
